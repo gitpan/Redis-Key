@@ -1,13 +1,43 @@
 package Redis::Key;
 
-# ABSTRACT: wrapper class of Redis' key
-
 use strict;
 use warnings;
 use Carp;
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Redis;
+
+# key:     you should not pass any args
+# pass:    do not change args
+# invalid: the command cannot use with Redis::Key
+our %command_type = (
+    del                => 'key',
+
+    auth               => 'pass',
+    bgrewriteaof       => 'pass',
+    bgsave             => 'pass',
+    config             => 'pass',
+    dbsize             => 'pass',
+    discard            => 'pass',
+    exec               => 'pass',
+    info               => 'pass',
+    lastsave           => 'pass',
+    ping               => 'pass',
+    save               => 'pass',
+    multi              => 'pass',
+    wait_all_responses => 'pass',
+    wait_one_responses => 'pass',
+
+    flushall           => 'invalid',
+    flushdb            => 'invalid',
+    quit               => 'invalid',
+    select             => 'invalid',
+    shutdown           => 'invalid',
+    slaveof            => 'invalid',
+);
+
+our %wrappers = (
+);
 
 sub new {
     my $class = shift;
@@ -23,11 +53,6 @@ sub new {
 sub redis { shift->{redis} }
 sub key { shift->{key} }
 
-sub wait_all_responses { shift->{redis}->wait_all_responses }
-sub wait_one_responses { shift->{redis}->wait_one_response }
-sub ping { shift->{redis}->ping }
-sub info { shift->{redis}->info }
-
 sub keys {
     my $self = shift;
     my $key = $self->{key};
@@ -37,6 +62,18 @@ sub keys {
         return $redis->keys($key);
     } else {
         return wantarray ? ($key) : 1;
+    }
+}
+
+sub scan {
+    my ($self, $iter, @args) = @_;
+    my $key = $self->{key};
+    if($self->{need_bind}) {
+        $key =~ s!{\w+}!*!g;
+        my $redis = $self->{redis};
+        return $redis->scan($iter, @args, MATCH => $key);
+    } else {
+        return (0, [$key]);
     }
 }
 
@@ -60,20 +97,50 @@ sub DESTROY { }
 
 our $AUTOLOAD;
 sub AUTOLOAD {
-  my $command = $AUTOLOAD;
-  $command =~ s/.*://;
+    my $command = $AUTOLOAD;
+    $command =~ s/.*://;
 
-  my $method = sub {
-      my $self = shift;
-      my $redis = $self->{redis};
-      my $key = $self->{key};
+    my $type = $command_type{$command} || 'normal';
+    my $method;
 
-      if($self->{need_bind}) {
-          croak "$key needs bind";
-      }
+    if($type eq 'normal') {
+        $method = sub {
+            my $self = shift;
+            my $redis = $self->{redis};
+            my $key = $self->{key};
 
-      $redis->$command($key, @_);
-  };
+            if($self->{need_bind}) {
+                croak "$key needs bind";
+            }
+
+            $redis->$command($key, @_);
+        };
+    } elsif($type eq 'key') {
+        $method = sub {
+            my $self = shift;
+            my $redis = $self->{redis};
+            my $key = $self->{key};
+
+            if($self->{need_bind}) {
+                croak "$key needs bind";
+            }
+            if(@_) {
+                croak "too many args for $command";
+            }
+
+            $redis->$command($key);
+        };
+    } elsif($type eq 'pass') {
+        $method = sub {
+            my $self = shift;
+            my $redis = $self->{redis};
+            $redis->$command(@_);
+        };
+    } elsif($type eq 'invalid') {
+        $method = sub {
+            croak "$command connot use with Redis::Key";
+        };
+    }
 
   # Save this method for future calls
   no strict 'refs';
@@ -85,9 +152,10 @@ sub AUTOLOAD {
 1;
 __END__
 
-=head1 AUTHOR
+=head1
 
-Ichinose Shogo E<lt>shogo82148@gmail.comE<gt>
+Redis::Key - wrapper class of Redis' key
+
 
 =head1 SYNOPSIS
 
@@ -106,9 +174,16 @@ Ichinose Shogo E<lt>shogo82148@gmail.comE<gt>
   $key_fugu->set('foobar');      # => $redis->set('hoge:FUGU:piyo', 'foobar');
   my @keys = $key_unbound->keys; # => $redis->keys('hoge:*:piyo');
 
+
 =head1 DESCRIPTION
 
 Redis::Key is a wrapper class of Redis' keys.
+
+
+=head1 AUTHOR
+
+Ichinose Shogo E<lt>shogo82148@gmail.comE<gt>
+
 
 =head1 SEE ALSO
 

@@ -11,6 +11,9 @@ eval { Test::RedisServer->new } or plan skip_all => 'redis-server is required in
 my $redis_server = Test::RedisServer->new;
 my $redis = Redis->new( $redis_server->connect_info );
 
+my $redis_version = version->parse($redis->info->{redis_version});
+
+
 subtest 'get/set' => sub {
     my $key = Redis::Key->new(redis => $redis, key => 'hoge');
 
@@ -102,6 +105,59 @@ subtest 'keys for normal key' => sub {
     is_deeply([sort $key->keys], [ "hoge:{fugu}:piyo" ], 'keys');
     is(scalar $key->keys, 1, 'keys count');
 
+    $redis->flushall;
+};
+
+
+subtest 'scan' => sub {
+    plan skip_all => 'your redis does not support SCAN command'
+        unless $redis_version >= '2.8.0';
+
+    $redis->set("hoge:$_:piyo", 'foobar') for (1..10);
+    $redis->set("Hoge:$_:piyo", 'foobar') for (1..10);
+    my $key = Redis::Key->new(redis => $redis, key => 'hoge:{fugu}:piyo', need_bind => 1);
+
+    my @keys;
+    my ($iter, $list) = (0, []);
+    while(1) {
+        ($iter, $list) = $key->scan($iter);
+        push @keys, @$list;
+        last if $iter == 0;
+    }
+
+    is_deeply([sort @keys], [sort map {"hoge:$_:piyo"} (1..10)], 'keys');
+
+    $redis->flushall;
+};
+
+
+subtest 'scan for normal key' => sub {
+    my $key = Redis::Key->new(redis => $redis, key => 'hoge:{fugu}:piyo');
+    is_deeply([$key->scan], [0, ['hoge:{fugu}:piyo']], 'returns only one key');
+    $redis->flushall;
+};
+
+
+subtest 'invalid commands' => sub {
+    # these commands are invalid because they maybe change another key
+    my $key = Redis::Key->new(redis => $redis, key => 'hoge');
+    throws_ok { $key->flushall; }    qr/flushall/;
+    throws_ok { $key->flushdb; }     qr/flushdb/;
+    throws_ok { $key->quit; }        qr/quit/;
+    throws_ok { $key->select; }      qr/select/;
+    throws_ok { $key->shutdown; }    qr/shutdown/;
+    throws_ok { $key->slaveof; }     qr/slaveof/;
+    $redis->flushall;
+};
+
+subtest 'DEL command' => sub {
+    my $key = Redis::Key->new(redis => $redis, key => 'hoge');
+    ok $key->set('value'), 'set value';
+    ok $key->exists, 'the key exists';
+    ok $key->del, 'can delete the key';
+    ok !$key->exists, 'the key does not exist after delete';
+
+    throws_ok { $key->del('aother:key'); } qr/del/, 'cannot delete another key';
     $redis->flushall;
 };
 

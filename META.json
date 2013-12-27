@@ -4,7 +4,7 @@
       "Ichinose Shogo <shogo82148@gmail.com>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Minilla/v0.8.0",
+   "generated_by" : "Minilla/v0.11.0",
    "license" : [
       "perl_5"
    ],
@@ -59,7 +59,7 @@
    "provides" : {
       "Redis::Key" : {
          "file" : "lib/Redis/Key.pm",
-         "version" : "0.01"
+         "version" : "0.02"
       }
    },
    "release_status" : "stable",
@@ -73,5 +73,5 @@
          "web" : "https://github.com/shogo82148/Redis-Key"
       }
    },
-   "version" : "0.01"
+   "version" : "0.02"
 }
