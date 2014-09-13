@@ -9,5 +9,6 @@ t/00_compile.t
 t/01_basic.t
 xt/02_perlcritic.t
 xt/perlcriticrc
+xt/release/kwalitee.t
 META.yml
 MANIFEST

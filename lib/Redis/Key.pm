@@ -3,7 +3,7 @@ package Redis::Key;
 use strict;
 use warnings;
 use Carp;
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Redis;
 
@@ -152,7 +152,7 @@ sub AUTOLOAD {
 1;
 __END__
 
-=head1
+=head1 NAME
 
 Redis::Key - wrapper class of Redis' key
 
